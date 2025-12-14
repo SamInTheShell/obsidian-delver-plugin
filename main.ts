@@ -92,6 +92,23 @@ export default class DelverPlugin extends Plugin {
 			}
 		});
 
+		// Change model
+		this.addCommand({
+			id: 'change-model',
+			name: 'Change model',
+			hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'm' }],
+			checkCallback: (checking: boolean) => {
+				const activeView = this.getActiveChatView();
+				if (activeView) {
+					if (!checking) {
+						activeView.openModelSelector();
+					}
+					return true;
+				}
+				return false;
+			}
+		});
+
 		// Open settings
 		this.addCommand({
 			id: 'open-settings',

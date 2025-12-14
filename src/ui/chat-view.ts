@@ -25,6 +25,7 @@ import { VaultFileFindTool, VaultFuzzyFindTool } from '../tools/vault-search';
 import { VaultReadTool } from '../tools/vault-read';
 import { ListReferencesTool } from '../tools/list-references';
 import { generateMessageId, generateSessionId, formatTokenCount, calculatePercentage } from './utils/helpers';
+import { ModelSuggestModal } from './utils/model-suggest-modal';
 
 export const CHAT_VIEW_TYPE = 'chat-view';
 
@@ -50,7 +51,8 @@ export class ChatView extends ItemView {
 	private inputTextarea: TextAreaComponent;
 	private welcomeTextarea: HTMLTextAreaElement | null = null; // Welcome message input
 	private contextDisplay: HTMLElement;
-	private modelDropdown: DropdownComponent;
+	private modelSelectorButton: HTMLElement;
+	private availableModels: string[] = [];
 	private thinkingDropdown: DropdownComponent;
 	private isEditingLimit: boolean = false;
 
@@ -671,23 +673,55 @@ export class ChatView extends ItemView {
 				await this.onSaveSettings();
 			});
 
-		// Model selector (with label integrated)
-		this.modelDropdown = new DropdownComponent(toolbar);
+		// Model selector button (opens searchable modal)
+		// Style it to match the dropdown appearance
+		this.modelSelectorButton = toolbar.createEl('button', {
+			cls: 'dropdown',
+			attr: {
+				'aria-label': 'Select model',
+				style: `
+					width: 200px;
+					text-align: left;
+					padding: 3px 20px 3px 6px;
+					background: var(--background-modifier-form-field);
+					border: 1px solid var(--background-modifier-border);
+					border-radius: 5px;
+					cursor: pointer;
+					position: relative;
+					font-size: var(--font-ui-small);
+					height: 30px;
+					display: flex;
+					align-items: center;
+					white-space: nowrap;
+					overflow: hidden;
+					text-overflow: ellipsis;
+				`.replace(/\s+/g, ' ').trim()
+			}
+		});
+
+		// Add model text
+		const modelText = this.modelSelectorButton.createSpan();
+		modelText.dataset.modelText = 'true'; // Add marker for easy selection
+		modelText.textContent = `Model: ${this.session?.model || this.settings.defaultModel}`;
+		modelText.style.overflow = 'hidden';
+		modelText.style.textOverflow = 'ellipsis';
+
+		// Add dropdown arrow icon (positioned at right like a select element)
+		const dropdownIcon = this.modelSelectorButton.createSpan();
+		dropdownIcon.style.position = 'absolute';
+		dropdownIcon.style.right = '4px';
+		dropdownIcon.style.display = 'flex';
+		dropdownIcon.style.alignItems = 'center';
+		dropdownIcon.style.pointerEvents = 'none';
+		setIcon(dropdownIcon, 'chevron-down');
+
+		// Click handler to open model selection modal
+		this.modelSelectorButton.addEventListener('click', () => {
+			this.openModelSelector();
+		});
+
+		// Load models from provider
 		this.populateModelOptions();
-		this.modelDropdown
-			.setValue(this.session?.model || this.settings.defaultModel)
-			.onChange(async (value) => {
-				if (this.session) {
-					this.session.model = value;
-					this.session.updatedAt = Date.now();
-					await this.onSaveSession(this.session);
-					await this.loadModelInfo();
-					await this.updateContextDisplay();
-				}
-				// Update default setting so new chats use this value
-				this.settings.defaultModel = value;
-				await this.onSaveSettings();
-			});
 	}
 
 	private populateModelOptions(): void {
@@ -695,18 +729,52 @@ export class ChatView extends ItemView {
 		const provider = this.providerRegistry.getProvider(this.settings.provider);
 		provider.listModels()
 			.then(models => {
-				this.modelDropdown.selectEl.empty();
-				for (const model of models) {
-					this.modelDropdown.addOption(model, `Model: ${model}`);
-				}
-				this.modelDropdown.setValue(this.session?.model || this.settings.defaultModel);
+				// Sort models alphabetically (case-insensitive)
+				this.availableModels = models.sort((a, b) =>
+					a.toLowerCase().localeCompare(b.toLowerCase())
+				);
+				this.updateModelButtonText();
 			})
 			.catch(() => {
-				// Fallback to default models
-				this.modelDropdown
-					.addOption('gpt-oss:20b', 'Model: gpt-oss:20b')
-					.addOption('qwen3:4b', 'Model: qwen3:4b');
+				// Fallback to default models (sorted)
+				this.availableModels = ['gpt-oss:20b', 'qwen3:4b'].sort((a, b) =>
+					a.toLowerCase().localeCompare(b.toLowerCase())
+				);
+				this.updateModelButtonText();
 			});
+	}
+
+	private updateModelButtonText(): void {
+		const currentModel = this.session?.model || this.settings.defaultModel;
+		const modelTextSpan = this.modelSelectorButton.querySelector('[data-model-text]');
+		if (modelTextSpan) {
+			modelTextSpan.textContent = `Model: ${currentModel}`;
+		}
+	}
+
+	public openModelSelector(): void {
+		const currentModel = this.session?.model || this.settings.defaultModel;
+		const modal = new ModelSuggestModal(
+			this.app,
+			this.availableModels,
+			currentModel,
+			async (selectedModel) => {
+				// Update session model
+				if (this.session) {
+					this.session.model = selectedModel;
+					this.session.updatedAt = Date.now();
+					await this.onSaveSession(this.session);
+					await this.loadModelInfo();
+					await this.updateContextDisplay();
+				}
+				// Update default setting so new chats use this value
+				this.settings.defaultModel = selectedModel;
+				await this.onSaveSettings();
+				// Update button text
+				this.updateModelButtonText();
+			}
+		);
+		modal.open();
 	}
 
 	private async loadModelInfo(): Promise<void> {
