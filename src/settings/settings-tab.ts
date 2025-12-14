@@ -226,19 +226,34 @@ export class DelverSettingTab extends PluginSettingTab {
 			attr: { style: 'color: var(--text-muted); margin-bottom: 10px;' }
 		});
 
-		// Vault Search Tool
+		// Vault File Find Tool
 		new Setting(containerEl)
-			.setName('Vault Search')
-			.setDesc('Search for files in your vault by name or pattern')
+			.setName('Vault File Find')
+			.setDesc('Find files by filename or path (simple, fast)')
 			.addDropdown(dropdown => dropdown
 				.addOption('ask', 'Ask (prompt before use)')
 				.addOption('allow', 'Allow (use without asking)')
 				.addOption('deny', 'Deny (never allow)')
 				.addOption('disabled', 'Disabled (hide from AI)')
-				.setValue(this.plugin.settings.toolPermissions['vault_search'] || 'ask')
+				.setValue(this.plugin.settings.toolPermissions['vault_file_find'] || 'ask')
 				.onChange((value: any) => {
 					// Update in memory only, save when tab closes
-					this.plugin.settings.toolPermissions['vault_search'] = value;
+					this.plugin.settings.toolPermissions['vault_file_find'] = value;
+				}));
+
+		// Vault Fuzzy Find Tool
+		new Setting(containerEl)
+			.setName('Vault Fuzzy Find')
+			.setDesc('Find files by searching filenames AND file content (slower but more thorough)')
+			.addDropdown(dropdown => dropdown
+				.addOption('ask', 'Ask (prompt before use)')
+				.addOption('allow', 'Allow (use without asking)')
+				.addOption('deny', 'Deny (never allow)')
+				.addOption('disabled', 'Disabled (hide from AI)')
+				.setValue(this.plugin.settings.toolPermissions['vault_fuzzy_find'] || 'ask')
+				.onChange((value: any) => {
+					// Update in memory only, save when tab closes
+					this.plugin.settings.toolPermissions['vault_fuzzy_find'] = value;
 				}));
 
 		// Vault Read Tool

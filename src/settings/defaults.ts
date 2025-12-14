@@ -14,7 +14,8 @@ export const DEFAULT_SETTINGS: DelverSettings = {
 	defaultContextMode: 'rolling',
 	thinkingLevel: 'medium',
 	toolPermissions: {
-		'vault_search': 'ask',
+		'vault_file_find': 'ask',
+		'vault_fuzzy_find': 'ask',
 		'vault_read': 'ask',
 		'list_references': 'allow'
 	},

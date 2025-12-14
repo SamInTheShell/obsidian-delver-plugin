@@ -21,7 +21,7 @@ import { ToolRegistry } from '../tools/registry';
 import { PermissionManager } from '../tools/permissions';
 import { ContextManager } from '../context/manager';
 import { ChatLoop } from '../generation/chat-loop';
-import { VaultSearchTool } from '../tools/vault-search';
+import { VaultFileFindTool, VaultFuzzyFindTool } from '../tools/vault-search';
 import { VaultReadTool } from '../tools/vault-read';
 import { ListReferencesTool } from '../tools/list-references';
 import { generateMessageId, generateSessionId, formatTokenCount, calculatePercentage } from './utils/helpers';
@@ -86,7 +86,8 @@ export class ChatView extends ItemView {
 		this.contextManager = new ContextManager();
 
 		// Register tools
-		this.toolRegistry.register(new VaultSearchTool());
+		this.toolRegistry.register(new VaultFileFindTool());
+		this.toolRegistry.register(new VaultFuzzyFindTool());
 		this.toolRegistry.register(new VaultReadTool());
 		this.toolRegistry.register(new ListReferencesTool());
 	}
@@ -1745,8 +1746,8 @@ export class ChatView extends ItemView {
 		try {
 			const result = JSON.parse(message.content);
 			
-			// Handle vault_search results
-			if (toolName === 'vault_search' && result.files && Array.isArray(result.files)) {
+			// Handle vault_file_find results
+			if (toolName === 'vault_file_find' && result.files && Array.isArray(result.files)) {
 				const headerEl = container.createEl('div', {
 					text: `Found ${result.count} file(s) matching "${result.query}"`,
 					attr: { style: 'margin-bottom: 8px; font-weight: 500;' }
@@ -1778,7 +1779,41 @@ export class ChatView extends ItemView {
 				}
 				formatted = true;
 			}
-			
+
+			// Handle vault_fuzzy_find results
+			else if (toolName === 'vault_fuzzy_find' && result.results && Array.isArray(result.results)) {
+				const headerEl = container.createEl('div', {
+					text: `Found ${result.count} file(s) matching "${result.query}"`,
+					attr: { style: 'margin-bottom: 8px; font-weight: 500;' }
+				});
+
+				if (result.results.length > 0) {
+					const filesContainer = container.createEl('div');
+					filesContainer.setCssStyles({
+						maxHeight: '200px',
+						overflow: 'auto',
+						padding: '4px',
+						backgroundColor: 'var(--background-primary)',
+						borderRadius: '4px'
+					});
+
+					for (const item of result.results) {
+						const linkEl = filesContainer.createEl('a', {
+							attr: { style: 'display: flex; align-items: center; gap: 4px; margin-bottom: 4px; color: var(--text-accent); cursor: pointer;' }
+						});
+						const fileIcon = linkEl.createSpan();
+						fileIcon.style.display = 'flex';
+						fileIcon.style.alignItems = 'center';
+						setIcon(fileIcon, 'file-text');
+						linkEl.createSpan({ text: `${item.path} (${item.matchType})` });
+						linkEl.onclick = () => {
+							this.app.workspace.openLinkText(item.path, '', false);
+						};
+					}
+				}
+				formatted = true;
+			}
+
 			// Handle list_references results
 			else if (toolName === 'list_references' && result.files && Array.isArray(result.files)) {
 				if (result.count === 0) {
@@ -2094,7 +2129,7 @@ export class ChatView extends ItemView {
 				// Add argument preview for certain tools
 				if (toolCall.function.name === 'vault_read' && toolCall.function.arguments.path) {
 					summaryText += `("${toolCall.function.arguments.path}")`;
-				} else if (toolCall.function.name === 'vault_search' && toolCall.function.arguments.query) {
+				} else if ((toolCall.function.name === 'vault_file_find' || toolCall.function.name === 'vault_fuzzy_find') && toolCall.function.arguments.query) {
 					summaryText += `("${toolCall.function.arguments.query}")`;
 				} else if (toolCall.function.name === 'list_references') {
 					summaryText += `()`;
@@ -2183,8 +2218,8 @@ export class ChatView extends ItemView {
 						showRawResult = false; // Don't show massive raw result here
 					}
 
-					// Special handling for vault_search - render file links (compact)
-					if (toolCall.function.name === 'vault_search') {
+					// Special handling for vault_file_find - render file links (compact)
+					if (toolCall.function.name === 'vault_file_find') {
 						try {
 							const searchResult = JSON.parse(toolCall.result);
 							if (searchResult.files && Array.isArray(searchResult.files)) {
@@ -2204,7 +2239,7 @@ export class ChatView extends ItemView {
 									backgroundColor: 'var(--background-primary)',
 									borderRadius: '4px'
 								});
-								
+
 								for (const filePath of searchResult.files) {
 									const linkEl = filesContainer.createEl('a', {
 										attr: { style: 'display: flex; align-items: center; gap: 4px; margin-bottom: 4px; color: var(--text-accent); cursor: pointer;' }
@@ -2218,7 +2253,50 @@ export class ChatView extends ItemView {
 										this.app.workspace.openLinkText(filePath, '', false);
 									};
 								}
-								
+
+								showRawResult = false; // Don't show raw JSON
+							}
+						} catch (e) {
+							// If parsing fails, fall through to show raw result
+						}
+					}
+
+					// Special handling for vault_fuzzy_find - render file links with match type
+					if (toolCall.function.name === 'vault_fuzzy_find') {
+						try {
+							const searchResult = JSON.parse(toolCall.result);
+							if (searchResult.results && Array.isArray(searchResult.results)) {
+								// Show count
+								toolContent.createEl('div', {
+									text: `Found ${searchResult.count} file(s) matching "${searchResult.query}"`,
+									attr: { style: 'margin-bottom: 8px; font-weight: 500;' }
+								});
+
+								// Render clickable file links in a scrollable container
+								const filesContainer = toolContent.createEl('div');
+								filesContainer.setCssStyles({
+									marginBottom: '8px',
+									maxHeight: '200px',
+									overflow: 'auto',
+									padding: '4px',
+									backgroundColor: 'var(--background-primary)',
+									borderRadius: '4px'
+								});
+
+								for (const item of searchResult.results) {
+									const linkEl = filesContainer.createEl('a', {
+										attr: { style: 'display: flex; align-items: center; gap: 4px; margin-bottom: 4px; color: var(--text-accent); cursor: pointer;' }
+									});
+									const fileIcon = linkEl.createSpan();
+									fileIcon.style.display = 'flex';
+									fileIcon.style.alignItems = 'center';
+									setIcon(fileIcon, 'file-text');
+									linkEl.createSpan({ text: `${item.path} (${item.matchType})` });
+									linkEl.onclick = () => {
+										this.app.workspace.openLinkText(item.path, '', false);
+									};
+								}
+
 								showRawResult = false; // Don't show raw JSON
 							}
 						} catch (e) {

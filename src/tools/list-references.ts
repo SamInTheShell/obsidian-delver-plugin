@@ -50,8 +50,8 @@ export class ListReferencesTool extends BaseTool {
 						}
 					}
 
-					// Extract file paths from vault_search results
-					if (toolCall.function.name === 'vault_search' && toolCall.result) {
+					// Extract file paths from vault_file_find results
+					if (toolCall.function.name === 'vault_file_find' && toolCall.result) {
 						try {
 							const searchResult = JSON.parse(toolCall.result);
 							if (searchResult.files && Array.isArray(searchResult.files)) {
@@ -59,6 +59,23 @@ export class ListReferencesTool extends BaseTool {
 									if (!uniqueOnly || !seenPaths.has(filePath)) {
 										references.push(filePath);
 										seenPaths.add(filePath);
+									}
+								}
+							}
+						} catch (e) {
+							// Skip if can't parse
+						}
+					}
+
+					// Extract file paths from vault_fuzzy_find results
+					if (toolCall.function.name === 'vault_fuzzy_find' && toolCall.result) {
+						try {
+							const searchResult = JSON.parse(toolCall.result);
+							if (searchResult.results && Array.isArray(searchResult.results)) {
+								for (const item of searchResult.results) {
+									if (!uniqueOnly || !seenPaths.has(item.path)) {
+										references.push(item.path);
+										seenPaths.add(item.path);
 									}
 								}
 							}
