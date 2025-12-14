@@ -1,0 +1,11 @@
+{
+	"id": "delver-plugin",
+	"name": "Delver Plugin",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Delve deep into your knowledge with AI.",
+	"author": "Obsidian",
+	"authorUrl": "https://hyperkube.org",
+	"fundingUrl": "https://hyperkube.org/need-help/",
+	"isDesktopOnly": false
+}
