@@ -54,6 +54,7 @@ export class ChatLoop {
 	 */
 	async run(
 		session: ChatSession,
+		systemPrompt: DelverMessage,
 		toolExecutionContext: ToolExecutionContext,
 		callbacks: ChatLoopCallbacks,
 		signal?: AbortSignal
@@ -61,7 +62,8 @@ export class ChatLoop {
 		// Get active messages from context manager
 		const activeMessages = this.contextManager.getActiveMessages(
 			session,
-			this.modelMaxTokens
+			this.modelMaxTokens,
+			systemPrompt
 		);
 
 		// Get enabled tools
@@ -113,6 +115,7 @@ export class ChatLoop {
 					// This ensures the message is fully processed before rendering
 					await this.handleToolCalls(
 						session,
+						systemPrompt,
 						assistantMessage,
 						toolExecutionContext,
 						callbacks,
@@ -148,6 +151,7 @@ export class ChatLoop {
 	 */
 	private async handleToolCalls(
 		session: ChatSession,
+		systemPrompt: DelverMessage,
 		message: DelverMessage,
 		toolExecutionContext: ToolExecutionContext,
 		callbacks: ChatLoopCallbacks,
@@ -234,7 +238,7 @@ export class ChatLoop {
 		}
 
 		// Continue generation with tool results
-		await this.run(session, toolExecutionContext, callbacks, signal);
+		await this.run(session, systemPrompt, toolExecutionContext, callbacks, signal);
 	}
 
 	/**

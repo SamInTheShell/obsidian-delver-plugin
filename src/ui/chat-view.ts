@@ -98,28 +98,17 @@ export class ChatView extends ItemView {
 	 * Update settings and refresh view
 	 */
 	async updateSettings(settings: DelverSettings): Promise<void> {
-		const assistantNameChanged = this.settings.assistantName !== settings.assistantName;
-		const systemPromptChanged = this.settings.systemPrompt !== settings.systemPrompt;
-		
 		this.settings = settings;
 		this.permissionManager.updatePermissions(settings.toolPermissions);
-		
-		// Update system message if assistant name or system prompt changed
-		if (this.session && (assistantNameChanged || systemPromptChanged)) {
-			const systemMessageIndex = this.session.messages.findIndex(m => m.role === 'system');
-			if (systemMessageIndex !== -1) {
-				// Replace the system message with a new one using current settings
-				this.session.messages[systemMessageIndex] = this.createSystemMessage();
-				this.session.updatedAt = Date.now();
-				await this.onSaveSession(this.session);
-			}
-		}
-		
+
 		// Re-render messages to reflect new assistant name
+		// System prompt will be used fresh on next generation (not stored)
 		if (this.chatMessagesContainer && this.session) {
 			this.renderMessages(false);
+			// Update context display to reflect new system prompt token count
+			await this.updateContextDisplay();
 		}
-		
+
 		// Update the view header to reflect new assistant name
 		// Obsidian will re-read getDisplayText() when we trigger a header update
 		if ((this as any).headerEl) {
@@ -535,11 +524,11 @@ export class ChatView extends ItemView {
 			if (this.settings.chatSessions[state.sessionId]) {
 				this.session = this.settings.chatSessions[state.sessionId];
 			} else {
-				// Create new session
+				// Create new session (system message is NOT stored, generated dynamically)
 				this.session = {
 					id: state.sessionId,
 					name: 'New Chat',
-					messages: [this.createSystemMessage()],
+					messages: [], // No system message - it's generated fresh each time
 					contextMode: this.settings.defaultContextMode,
 					model: this.settings.defaultModel,
 					createdAt: Date.now(),
@@ -973,8 +962,12 @@ export class ChatView extends ItemView {
 		let hasStartedContent = false; // Track if we've started content (to collapse thinking)
 
 		try {
+			// Generate fresh system prompt for this generation
+			const systemPrompt = this.createSystemMessage();
+
 			await chatLoop.run(
 				this.session,
+				systemPrompt,
 				toolContext,
 				{
 					onChunk: (chunk: GenerationChunk) => {
@@ -3547,9 +3540,13 @@ export class ChatView extends ItemView {
 	private async updateContextDisplay(): Promise<void> {
 		if (!this.contextDisplay || !this.session) return;
 
+		// Generate fresh system prompt for context calculation
+		const systemPrompt = this.createSystemMessage();
+
 		const state = this.contextManager.getContextState(
 			this.session,
-			this.session.contextLimit || this.modelContextLength
+			this.session.contextLimit || this.modelContextLength,
+			systemPrompt
 		);
 
 		const percentage = calculatePercentage(state.currentTokens, state.maxTokens);
@@ -3564,9 +3561,13 @@ export class ChatView extends ItemView {
 		this.isEditingLimit = true;
 		this.contextDisplay.empty();
 
+		// Generate fresh system prompt for context calculation
+		const systemPrompt = this.createSystemMessage();
+
 		const state = this.contextManager.getContextState(
 			this.session,
-			this.session.contextLimit || this.modelContextLength
+			this.session.contextLimit || this.modelContextLength,
+			systemPrompt
 		);
 
 		const percentage = calculatePercentage(state.currentTokens, state.maxTokens);

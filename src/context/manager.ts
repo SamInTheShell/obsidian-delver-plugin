@@ -16,17 +16,19 @@ export class ContextManager {
 	/**
 	 * Get active messages for API based on context mode
 	 * Always includes system prompt first, then applies mode logic
+	 * @param session The chat session
+	 * @param maxTokens Maximum context tokens
+	 * @param systemPrompt The current system prompt (dynamically generated)
 	 */
-	getActiveMessages(session: ChatSession, maxTokens: number): DelverMessage[] {
+	getActiveMessages(session: ChatSession, maxTokens: number, systemPrompt: DelverMessage): DelverMessage[] {
 		const config: ContextConfig = {
 			mode: session.contextMode,
 			maxTokens: session.contextLimit || maxTokens,
 			rollingWindowSize: 20 // Default rolling window size
 		};
 
-		const allMessages = session.messages;
-		const systemPrompt = allMessages.find(m => m.role === 'system');
-		const conversationMessages = allMessages.filter(m => m.role !== 'system');
+		// Get all conversation messages (excluding any old system messages that might still exist)
+		const conversationMessages = session.messages.filter(m => m.role !== 'system');
 
 		let activeMessages: DelverMessage[] = [];
 
@@ -50,23 +52,24 @@ export class ContextManager {
 			return msg;
 		});
 
-		// Always prepend system prompt if it exists
-		if (systemPrompt) {
-			activeMessages.unshift(systemPrompt);
-		}
+		// Always prepend the current system prompt
+		activeMessages.unshift(systemPrompt);
 
 		return activeMessages;
 	}
 
 	/**
 	 * Get context state (for UI display)
+	 * @param session The chat session
+	 * @param maxTokens Maximum context tokens
+	 * @param systemPrompt The current system prompt (dynamically generated)
 	 */
-	getContextState(session: ChatSession, maxTokens: number): ContextState {
-		const activeMessages = this.getActiveMessages(session, maxTokens);
+	getContextState(session: ChatSession, maxTokens: number, systemPrompt: DelverMessage): ContextState {
+		const activeMessages = this.getActiveMessages(session, maxTokens, systemPrompt);
 		const currentTokens = this.tokenEstimator.estimateMessages(activeMessages);
 
 		return {
-			messages: session.messages,
+			messages: session.messages.filter(m => m.role !== 'system'), // Exclude old system messages from state
 			activeMessages,
 			currentTokens,
 			maxTokens: session.contextLimit || maxTokens
