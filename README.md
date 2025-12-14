@@ -26,3 +26,11 @@ curl -sLO https://github.com/SamInTheShell/obsidian-delver-plugin/releases/downl
 5. Enable `Delver Plugin`.
 6. Close the settings.
 7. Open a new chat from the ribbon or with CTRL+SHIFT+C.
+
+**Bug Reports**
+
+Simply log an issue with clear steps to reproduce the bug.
+
+Be sure to include details on what the expected results were.
+
+Contributions are also welcome as long as they are under the MIT License.
