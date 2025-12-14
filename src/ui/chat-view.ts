@@ -2487,13 +2487,14 @@ export class ChatView extends ItemView {
 		const isLastVisibleMessage = visibleMessages.length > 0 && visibleMessages[visibleMessages.length - 1] === message;
 		const isUserMessage = message.role === 'user';
 		const isToolMessage = message.role === 'tool';
-		
+		const isAssistant = message.role === 'assistant';
+
 		// User messages and tool messages always get action buttons (fork, edit, delete)
-		// Last visible message gets regenerate/continue buttons (if assistant)
+		// Assistant messages get action buttons (specific buttons shown based on content and position)
 		// Only show actions if message is not streaming and has no pending tool calls
-		const shouldHaveActions = !message.isStreaming && 
+		const shouldHaveActions = !message.isStreaming &&
 			!(message.tool_calls && message.tool_calls.length > 0 && message.tool_calls.some(tc => !tc.result && !tc.error && !tc.permissionStatus)) &&
-			(isUserMessage || isToolMessage || isLastVisibleMessage);
+			(isUserMessage || isToolMessage || isAssistant);
 
 		// Determine what meaningful content exists
 		const hasContent = message.content && message.content.trim().length > 0;
